@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Word Game</title>
+  <!-- <link rel="stylesheet" type="text/css" href="style.css"> -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      display: flex;
+      padding: 0 10px;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      background: #e2dcc8;
+    }
+
+    .wrapper {
+      width: 430px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .wrapper h1 {
+      font-size: 25px;
+      font-weight: 500;
+      padding: 20px 25px;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .wrapper .content {
+      margin: 25px 25px 35px;
+    }
+
+    .content .inputs {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .inputs input {
+      height: 57px;
+      width: 56px;
+      margin: 4px;
+      font-size: 24px;
+      font-weight: 500;
+      color: #e2dcc8;
+      text-align: center;
+      border-radius: 5px;
+      background: none;
+      pointer-events: none;
+      text-transform: uppercase;
+      border: 1px solid #b5b5b5;
+    }
+
+    .typing-input {
+      opacity: 0;
+      z-index: -999;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .inputs input:first-child {
+      margin-left: 0px;
+    }
+
+    .content .details {
+      margin: 20px 0 25px;
+    }
+
+    .details p {
+      font-size: 19px;
+      margin-bottom: 10px;
+    }
+
+    .content .reset-btn {
+      width: 100%;
+      border: none;
+      cursor: pointer;
+      color: #fff;
+      outline: none;
+      padding: 15px 0;
+      font-size: 17px;
+      border-radius: 5px;
+      background: #e2dcc8;
+      transition: all 0.3s ease;
+    }
+
+    .content .reset-btn:hover {
+      background: #e2dcc8;
+    }
+
+    .negative-score {
+      color: red;
+    }
+
+    @media screen and (max-width: 460px) {
+      .wrapper {
+        width: 100%;
+      }
+
+      .wrapper h1 {
+        font-size: 22px;
+        padding: 16px 20px;
+      }
+
+      .wrapper .content {
+        margin: 25px 20px 35px;
+      }
+
+      .inputs input {
+        height: 51px;
+        width: 50px;
+        margin: 3px;
+        font-size: 22px;
+      }
+
+      .details p {
+        font-size: 17px;
+      }
+
+      .content .reset-btn {
+        padding: 14px 0;
+        font-size: 16px;
+      }
+    }
+  </style>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@1.16.0/dist/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    const wordApiUrl = "https://random-word-api.herokuapp.com/word?number=1";
+    const definitionApiUrl = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+    const maxAttempts = 5;
+    let randomWord, attemptsLeft, score = 0;
+
+    function startGame() {
+      fetchRandomWord()
+        .then(word => {
+          randomWord = word.toLowerCase();
+          attemptsLeft = maxAttempts;
+          document.getElementById("message").textContent = "";
+          updateHint(randomWord);
+          updateScore(); // Update the score display
+        })
+        .catch(error => {
+          console.log("Error fetching random word:", error);
+          showMessage("Failed to fetch word. Please try again.", "danger");
+        });
+    }
+
+    function fetchRandomWord() {
+      return fetch(wordApiUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("API request failed");
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (!data || data.length === 0) {
+            throw new Error("Invalid response from API");
+          }
+          return data[0];
+        });
+    }
+
+    function fetchWordDefinition(word) {
+      const definitionUrl = `${definitionApiUrl}${word}`;
+      return fetch(definitionUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("API request failed");
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (!Array.isArray(data) || data.length === 0) {
+            throw new Error("No definition found");
+          }
+          const definition = data[0]?.meanings?.[0]?.definitions?.[0]?.definition;
+          if (!definition) {
+            throw new Error("No definition found");
+          }
+          return definition;
+        });
+    }
+
+    function performGoogleSearch(term) {
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(term)}`;
+      window.open(searchUrl, "_blank");
+    }
+
+    function checkGuess() {
+      const guessInput = document.getElementById("guessInput");
+      const guess = guessInput.value.toLowerCase();
+
+      if (guess === randomWord) {
+        score+= 5; // Increment the score
+        updateScore(); // Update the score display
+        showMessage("Congratulations! You guessed the word.", "success");
+        guessInput.disabled = true;
+        setTimeout(restartGame, 2000); // Restart game after 2 seconds
+      } else {
+        attemptsLeft--;
+        if (attemptsLeft > 0) {
+          showMessage(`Wrong guess. ${attemptsLeft} attempts left.`, "danger");
+        } else {
+          showMessage(`Game Over!! The word was "${randomWord}".`, "danger");
+          guessInput.disabled = true;
+          setTimeout(restartGame, 2000); // Restart game after 2 seconds
+        }
+      }
+
+      guessInput.value = "";
+      guessInput.focus();
+    }
+
+    function showHint() {
+      fetchWordDefinition(randomWord)
+        .then(definition => {
+          const hintWords = generateHintWords(randomWord);
+          const hint = randomWord.charAt(0) + hintWords.join(" ") + randomWord.charAt(randomWord.length - 1);
+          showMessage(`Word Length: "${randomWord.length}"<br>Starting Letter: "${randomWord.charAt(0)}"<br>Ending Letter: "${randomWord.charAt(randomWord.length - 1)}"<br>Hint Words: ${hint}<br>`, "hint");
+          reduceScore(); // Reduce the score
+        })
+        .catch(error => {
+          console.log("Error fetching word definition:", error);
+          showMessage("Failed to fetch word definition. Please try again by Refreshing the page.", "danger");
+        });
+    }
+
+    function generateHintWords(word) {
+      const hintWords = [];
+      for (let i = 1; i < word.length - 1; i++) {
+        const randomChar = getRandomCharacter();
+        hintWords.push(randomChar);
+      }
+      return hintWords;
+    }
+
+    function getRandomCharacter() {
+      const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      return characters.charAt(randomIndex);
+    }
+
+    function reduceScore() {
+      score--;
+      updateScore(); // Update the score display
+    }
+
+    function restartGame() {
+      randomWord = "";
+      attemptsLeft = 0;
+      hideMessage();
+      document.getElementById("guessInput").disabled = false;
+      document.getElementById("guessInput").value = "";
+      startGame();
+    }
+
+    function showMessage(message, type) {
+      const messageElement = document.getElementById("message");
+      messageElement.innerHTML = message;
+      messageElement.classList.add("alert", `alert-${type}`);
+      messageElement.classList.add("fade-in");
+      messageElement.style.display = "block";
+    }
+
+    function hideMessage() {
+      const messageElement = document.getElementById("message");
+      messageElement.innerHTML = "";
+      messageElement.style.display = "none";
+      messageElement.className = "alert mt-4";
+    }
+
+    function updateScore() {
+      const scoreElement = document.getElementById("score");
+      scoreElement.textContent = `Score: ${score}`;
+      scoreElement.classList.toggle("negative-score", score < 0);
+    }
+
+    function updateHint(word) {
+      fetchWordDefinition(word)
+        .then(definition => {
+          const hint = `Hint: The word means "${definition}".`;
+          document.getElementById("hint").textContent = hint;
+        })
+        .catch(error => {
+          console.log("Error fetching word definition:", error);
+          document.getElementById("hint").textContent = "Failed to fetch word definition. Please refresh it!";
+        });
+    }
+
+    window.onload = startGame;
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mt-5">Word Game</h1>
+    <p class="text-center">Guess the word:</p>
+    <div class="text-center">
+      <input type="text" id="guessInput" class="form-control w-50 mx-auto" placeholder="Enter your guess">
+      <button onclick="checkGuess()" class="btn btn-primary mt-3">Submit</button>
+      <button onclick="showHint()" class="btn btn-secondary mt-3">Hint</button>
+      <button onclick="performGoogleSearch(randomWord)" class="btn btn-primary mt-3">Search</button>
+      <div id="message" class="alert mt-4"></div>
+      <div id="hint" class="alert alert-hint mt-4"></div>
+      <div id="score" class="mt-4">Score: 0</div>
+    </div>
+  </div>
+</body>
+</html>
